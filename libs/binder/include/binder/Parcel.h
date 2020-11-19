@@ -1007,6 +1007,16 @@ status_t Parcel::writeParcelableVector(const std::shared_ptr<std::vector<std::op
     return unsafeWriteTypedVector<NullableT, const NullableT&>(*val, &Parcel::writeNullableParcelable);
 }
 
+template<typename T>
+status_t Parcel::writeParcelableVector(const std::shared_ptr<std::vector<std::optional<T>>>& val) {
+    if (val.get() == nullptr) {
+        return this->writeInt32(-1);
+    }
+
+    using NullableT = std::optional<T>;
+    return unsafeWriteTypedVector<NullableT, const NullableT&>(*val, &Parcel::writeNullableParcelable);
+}
+
 template<typename T, std::enable_if_t<std::is_same_v<typename std::underlying_type_t<T>,int32_t>, bool>>
 status_t Parcel::writeEnum(const T& val) {
     return writeInt32(static_cast<int32_t>(val));
