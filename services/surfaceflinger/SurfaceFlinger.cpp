@@ -1548,6 +1548,7 @@ void SurfaceFlinger::setDesiredActiveMode(const ActiveModeInfo& info) {
         // Initiate a mode change.
         mDesiredActiveModeChanged = true;
         mDesiredActiveMode = info;
+        display->resetVsyncPeriod();
 
         // This will trigger HWC refresh without resetting the idle timer.
         repaintEverythingForHWC();
@@ -1670,7 +1671,8 @@ void SurfaceFlinger::desiredActiveModeChangeDone() {
     clearDesiredActiveModeState();
 
     const auto refreshRate = getDefaultDisplayDeviceLocked()->getMode(modeId)->getFps();
-    mScheduler->resyncToHardwareVsync(true, refreshRate.getPeriodNsecs());
+    mScheduler->resyncToHardwareVsync(true, getCurrentVsyncSource()->isPrimary() ?
+        refreshRate.getPeriodNsecs() : getVsyncPeriodFromHWC());
     updatePhaseConfiguration(refreshRate);
 }
 
@@ -2270,6 +2272,33 @@ nsecs_t SurfaceFlinger::getVsyncPeriodFromHWC() const {
     }
 
     return 0;
+}
+
+sp<DisplayDevice> SurfaceFlinger::getCurrentVsyncSource() {
+    Mutex::Autolock lock(mStateLock);
+    if (mNextVsyncSource) {
+        return mNextVsyncSource;
+    } else if (mActiveVsyncSource) {
+        return mActiveVsyncSource;
+    }
+
+    return getDefaultDisplayDeviceLocked();
+}
+
+nsecs_t SurfaceFlinger::getVsyncPeriodFromHWCcb() {
+    Mutex::Autolock lock(mStateLock);
+    auto display = getDefaultDisplayDeviceLocked();
+    if (mNextVsyncSource) {
+        display = mNextVsyncSource;
+    } else if (mActiveVsyncSource) {
+        display = mActiveVsyncSource;
+    }
+
+    if (display && !display->isPrimary()) {
+        return display->getVsyncPeriodFromHWC();
+    }
+
+    return mRefreshRateConfigs->getCurrentRefreshRate().getVsyncPeriod();
 }
 
 void SurfaceFlinger::onComposerHalVsync(hal::HWDisplayId hwcDisplayId, int64_t timestamp,
@@ -3784,6 +3813,7 @@ void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
         getRenderEngine().cleanFramebufferCache();
 
         if (const auto display = getDisplayDeviceLocked(displayToken)) {
+            mDisplaysList.remove(display);
             display->disconnect();
             if (display->isVirtual()) {
                 releaseVirtualDisplay(display->getVirtualId());
