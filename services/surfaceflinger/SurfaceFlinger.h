@@ -1704,7 +1704,6 @@ private:
     bool mDynamicSfIdleEnabled = false;
     bool wakeUpPresentationDisplays = false;
     bool mInternalPresentationDisplays = false;
-    bool mSmomoContentFpsEnabled = false;
 
     composer::ComposerExtnIntf *mComposerExtnIntf = nullptr;
     composer::FrameSchedulerIntf *mFrameSchedulerExtnIntf = nullptr;
@@ -1720,6 +1719,7 @@ private:
     int mRETid = 0;
     int mSFTid = 0;
     bool mTidSentSuccessfully = false;
+    int mUiLayerFrameCount = 0;
 };
 
 } // namespace android
